@@ -46,7 +46,7 @@ export class CloudwaysAuth {
     const url = `${normalizeBaseUrl(this.baseUrl)}${path}`;
     const { data } = await this.http.post<TokenResponse>(url, {
       email,
-      api_token: apiToken,
+      api_key: apiToken,
     });
     return data;
   }

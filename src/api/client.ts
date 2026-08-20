@@ -14,6 +14,7 @@ export class CloudwaysClient {
       headers: {
         Accept: "application/json",
         "Content-Type": "application/json",
+        "User-Agent": "cloudways-mcp-server/1.0.0",
       },
     });
     this.auth = new CloudwaysAuth(this.http, this.baseUrl);
