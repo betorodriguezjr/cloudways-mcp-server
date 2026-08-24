@@ -2,7 +2,14 @@
 
 Servidor MCP para operar Cloudways desde Claude Code u otros clientes MCP.
 
-> Nota importante: la documentacion publica de Cloudways indica que API V1 llega a fin de vida el 31 de marzo de 2026. Este paquete sigue la estructura V1 del brief original, con `CLOUDWAYS_API_BASE_URL` configurable para poder migrar endpoints a V2 sin reescribir los tools.
+>  Note: Cloudways API v1 reached end-of-life on 2026-03-31. This package now targets
+> **v2** (`https://api.cloudways.com/api/v2`), which accepts the same credentials and
+> returns the same payloads. Override with `CLOUDWAYS_API_BASE_URL` if needed.
+>
+> All endpoint paths were verified against the live API and the official operation
+> reference on 2026-08-24. Cloudways answers unknown paths with **HTTP 200 and the
+> plain-text body `You have reached Cloudways API.`** rather than a 404, so a wrong
+> path fails silently — `test/smoke.mjs` exists to catch exactly that.
 
 ## Tools incluidos
 
@@ -11,10 +18,8 @@ Servidor MCP para operar Cloudways desde Claude Code u otros clientes MCP.
 - `get-server-stats`
 - `deploy-cloudways-app`
 - `check-deployment-status`
-- `get-cloudways-logs`
-- `set-environment-variable`
-- `list-environment-variables`
-- `manage-ssl-certificate`
+- `get-cloudways-logs` (staging deployment logs only — the API exposes no others)
+- `manage-ssl-certificate` (`install_letsencrypt` / `renew_letsencrypt` / `revoke_letsencrypt` / `install_custom`)
 - `create-cloudways-backup`
 - `list-cloudways-backups`
 - `restart-cloudways-service`
@@ -67,8 +72,9 @@ npm run dev
 ## Seguridad
 
 - No commitees `.env` ni tokens.
-- `list-environment-variables` redacta valores sensibles.
 - Los certificados SSL custom se pasan solo en la llamada MCP y no se escriben en disco.
+- `set-environment-variable` / `list-environment-variables` were removed: the Cloudways
+  API has no environment-variable endpoints at all. Use SSH or the Cloudways panel.
 
 ## Desarrollo
 
@@ -77,4 +83,12 @@ npm run typecheck
 npm run build
 ```
 
-Los endpoints estan centralizados en `src/api/*`. Si Cloudways V2 usa rutas distintas, ajusta esas clases y los nombres de tools pueden quedarse estables.
+Los endpoints estan centralizados en `src/api/*`.
+
+Read-only check against the live API (needs `CLOUDWAYS_EMAIL` + `CLOUDWAYS_API_TOKEN`):
+
+```bash
+npm run build && npm run smoke
+```
+
+It never issues a write — no deploy, backup, SSL change, or service restart.

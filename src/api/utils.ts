@@ -68,17 +68,6 @@ export function firstNumber(record: JsonRecord, keys: string[]): number | undefi
   return undefined;
 }
 
-export function sanitizeEnvironmentVariables(value: unknown): JsonRecord[] {
-  return toArray<JsonRecord>(value).map((item) => {
-    const name = firstString(item, ["name", "variable_name", "key"]);
-    return {
-      name,
-      value: item.value ? "[redacted]" : undefined,
-      is_secret: Boolean(item.is_secret ?? item.secret ?? item.hidden),
-    };
-  });
-}
-
 export function jsonContent(data: unknown) {
   return {
     content: [

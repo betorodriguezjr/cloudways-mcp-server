@@ -4,8 +4,13 @@ import { jsonContent, toolError } from "../api/utils.js";
 import { AppTargetSchema } from "../schemas/app.schema.js";
 import { ToolContext } from "./context.js";
 
+// The Cloudways API has no "read current SSL" endpoint, so the old "list"
+// action was never real. These four are the operations it actually exposes.
 const InputSchema = AppTargetSchema.extend({
-  action: z.enum(["list", "enable_auto", "install_custom"]),
+  action: z.enum(["install_letsencrypt", "renew_letsencrypt", "revoke_letsencrypt", "install_custom"]),
+  ssl_email: z.string().email().optional(),
+  ssl_domains: z.array(z.string().min(1)).optional(),
+  wild_card: z.boolean().default(false),
   certificate_content: z.string().optional(),
   key_content: z.string().optional(),
 });
@@ -15,23 +20,19 @@ export function registerManageSslTool(server: McpServer, context: ToolContext) {
     "manage-ssl-certificate",
     {
       title: "Manage SSL Certificate",
-      description: "List, enable automatic SSL, or install a custom SSL certificate for an app.",
+      description: "Install, renew, or revoke Let's Encrypt, or install a custom certificate, for a Cloudways app.",
       inputSchema: InputSchema,
     },
     async (input) => {
       try {
-        if (input.action === "install_custom" && (!input.certificate_content || !input.key_content)) {
-          return toolError("certificate_content and key_content are required for install_custom");
-        }
-
         return jsonContent(
-          await context.ssl.manageCertificate(
-            input.server_id,
-            input.app_id,
-            input.action,
-            input.certificate_content,
-            input.key_content,
-          ),
+          await context.ssl.manageCertificate(input.server_id, input.app_id, input.action, {
+            sslEmail: input.ssl_email,
+            sslDomains: input.ssl_domains,
+            wildCard: input.wild_card,
+            certificate: input.certificate_content,
+            key: input.key_content,
+          }),
         );
       } catch (error) {
         return toolError(error);
@@ -39,4 +40,3 @@ export function registerManageSslTool(server: McpServer, context: ToolContext) {
     },
   );
 }
-

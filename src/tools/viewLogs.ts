@@ -3,11 +3,11 @@ import { z } from "zod";
 import { jsonContent, toolError } from "../api/utils.js";
 import { ToolContext } from "./context.js";
 
+// The Cloudways API only exposes staging deployment logs; log_type/lines had
+// no backing endpoint and were silently ignored, so they are gone.
 const InputSchema = z.object({
   server_id: z.string().min(1),
   app_id: z.string().min(1),
-  log_type: z.enum(["application", "error", "access", "deployment"]),
-  lines: z.number().int().positive().max(1000).default(50),
 });
 
 export function registerViewLogsTool(server: McpServer, context: ToolContext) {
@@ -15,12 +15,12 @@ export function registerViewLogsTool(server: McpServer, context: ToolContext) {
     "get-cloudways-logs",
     {
       title: "Get Cloudways Logs",
-      description: "Read recent Cloudways application, error, access, or deployment logs.",
+      description: "Read the staging deployment logs for a Cloudways application.",
       inputSchema: InputSchema,
     },
     async (input) => {
       try {
-        return jsonContent(await context.logs.getLogs(input.server_id, input.app_id, input.log_type, input.lines));
+        return jsonContent(await context.logs.getLogs(input.server_id, input.app_id));
       } catch (error) {
         return toolError(error);
       }

@@ -1,13 +1,24 @@
 import { CloudwaysClient } from "./client.js";
-import { firstNumber, firstString, JsonRecord, toArray } from "./utils.js";
+import { firstString, JsonRecord, toArray } from "./utils.js";
 
 export type ServerFilter = "running" | "stopped" | "all";
+
+/** serverUsage returns its payload as a JSON string in `parameters`. */
+function parseOperationParameters(operation: JsonRecord): JsonRecord {
+  const raw = operation.parameters;
+  if (typeof raw !== "string") return (raw as JsonRecord) ?? {};
+  try {
+    return JSON.parse(raw) as JsonRecord;
+  } catch {
+    return {};
+  }
+}
 
 export class ServersApi {
   constructor(private readonly client: CloudwaysClient) {}
 
   async listServers(filter: ServerFilter = "all") {
-    const data = await this.client.request("GET", "/servers");
+    const data = await this.client.request("GET", "/server");
     const servers = toArray<JsonRecord>(data).map((server) => ({
       server_id: firstString(server, ["server_id", "id"]),
       label: firstString(server, ["label", "name", "server_name"]),
@@ -20,31 +31,54 @@ export class ServersApi {
     return servers.filter((server) => server.status.toLowerCase() === filter);
   }
 
+  /**
+   * Cloudways has no synchronous "server stats" endpoint. Live per-application
+   * CPU/RAM comes from /server/analytics/serverUsage, which is asynchronous, and
+   * service state comes from /service. Both are combined here.
+   */
   async getServerStats(serverId: string) {
-    const data = await this.client.request<JsonRecord>("GET", `/servers/${encodeURIComponent(serverId)}/stats`);
+    const started = await this.client.request<JsonRecord>("GET", "/server/analytics/serverUsage", undefined, {
+      params: { server_id: serverId },
+    });
+
+    const operationId = firstString(started, ["operation_id", "id"]);
+    const operation = operationId ? await this.client.pollOperation(operationId) : {};
+    const rows = toArray<unknown>(
+      ((parseOperationParameters(operation).applications as JsonRecord) ?? {}).body,
+    );
+
+    const applications = rows
+      .filter((row): row is unknown[] => Array.isArray(row))
+      .map((row) => ({
+        sys_user: String(row[0] ?? ""),
+        cpu_usage: String(row[1] ?? ""),
+        ram_usage: String(row[2] ?? ""),
+      }));
+
+    const services = await this.client.request<JsonRecord>("GET", "/service", undefined, {
+      params: { server_id: serverId },
+    });
+
     return {
-      cpu_usage: firstNumber(data, ["cpu_usage", "cpu", "cpu_percent"]),
-      ram_usage: firstNumber(data, ["ram_usage", "memory_usage", "ram_percent"]),
-      disk_usage: firstNumber(data, ["disk_usage", "disk_percent"]),
-      uptime: firstString(data, ["uptime", "server_uptime"]),
-      load_average: data.load_average ?? data.load ?? data.loadavg,
-      raw: data,
+      server_id: serverId,
+      applications,
+      services: (services.services as JsonRecord)?.status ?? services.services ?? {},
+      operation_completed: String((operation as JsonRecord).is_completed ?? "0") === "1",
     };
   }
 
   async restartService(serverId: string, service: string) {
-    const data = await this.client.request<JsonRecord>(
-      "POST",
-      `/servers/${encodeURIComponent(serverId)}/services/${encodeURIComponent(service)}/restart`,
-    );
+    const data = await this.client.request<JsonRecord>("POST", "/service/state", {
+      server_id: serverId,
+      service,
+      state: "restart",
+    });
 
     return {
       service,
-      previous_status: data.previous_status ?? data.before_status,
-      new_status: data.new_status ?? data.status ?? "restart_requested",
-      restarted_at: firstString(data, ["restarted_at", "updated_at"], new Date().toISOString()),
+      operation_id: firstString(data, ["operation_id", "id"]),
+      status: firstString(data, ["status"], "restart_requested"),
       raw: data,
     };
   }
 }
-

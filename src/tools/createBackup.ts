@@ -1,12 +1,10 @@
 import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
-import { z } from "zod";
 import { jsonContent, toolError } from "../api/utils.js";
 import { AppTargetSchema } from "../schemas/app.schema.js";
 import { ToolContext } from "./context.js";
 
-const CreateInputSchema = AppTargetSchema.extend({
-  backup_name: z.string().optional(),
-});
+// Cloudways takeBackup accepts no name/label parameter.
+const CreateInputSchema = AppTargetSchema;
 
 export function registerBackupTools(server: McpServer, context: ToolContext) {
   server.registerTool(
@@ -18,7 +16,7 @@ export function registerBackupTools(server: McpServer, context: ToolContext) {
     },
     async (input) => {
       try {
-        return jsonContent(await context.backups.createBackup(input.server_id, input.app_id, input.backup_name));
+        return jsonContent(await context.backups.createBackup(input.server_id, input.app_id));
       } catch (error) {
         return toolError(error);
       }

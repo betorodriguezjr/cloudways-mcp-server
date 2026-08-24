@@ -1,43 +1,30 @@
 import { CloudwaysClient } from "./client.js";
-import { firstString, JsonRecord, sanitizeEnvironmentVariables, toArray } from "./utils.js";
+import { CloudwaysApiError, firstString, JsonRecord, toArray } from "./utils.js";
 
 export class ApplicationsApi {
   constructor(private readonly client: CloudwaysClient) {}
 
+  /**
+   * Cloudways has no per-server "list apps" endpoint: GET /server already
+   * embeds each server's apps[], so the list is derived from there.
+   */
   async listApplications(serverId: string) {
-    const data = await this.client.request("GET", `/servers/${encodeURIComponent(serverId)}/apps`);
-    return toArray<JsonRecord>(data).map((app) => ({
-      app_id: firstString(app, ["app_id", "id", "application_id"]),
-      app_name: firstString(app, ["app_name", "name", "label"]),
-      app_status: firstString(app, ["app_status", "status"], "unknown"),
-      domain: firstString(app, ["domain", "app_fqdn", "url"]),
-      git_branch: firstString(app, ["git_branch", "branch"]),
-      last_deployed: firstString(app, ["last_deployed", "last_deployment", "updated_at"]),
+    const data = await this.client.request<JsonRecord>("GET", "/server");
+    const server = toArray<JsonRecord>(data).find(
+      (candidate) => firstString(candidate, ["id", "server_id"]) === String(serverId),
+    );
+
+    if (!server) {
+      throw new CloudwaysApiError(`Server ${serverId} not found on this Cloudways account`);
+    }
+
+    return toArray<JsonRecord>(server.apps).map((app) => ({
+      app_id: firstString(app, ["id", "app_id", "application_id"]),
+      app_name: firstString(app, ["label", "app_name", "name"]),
+      domain: firstString(app, ["app_fqdn", "cname", "domain"]),
+      application: firstString(app, ["application", "app_type"]),
+      sys_user: firstString(app, ["sys_user"]),
+      created_at: firstString(app, ["created_at", "created_on"]),
     }));
   }
-
-  async setEnvironmentVariable(serverId: string, appId: string, variableName: string, variableValue: string) {
-    const data = await this.client.request<JsonRecord>(
-      "POST",
-      `/servers/${encodeURIComponent(serverId)}/apps/${encodeURIComponent(appId)}/environment-variable`,
-      {
-        variable_name: variableName,
-        variable_value: variableValue,
-      },
-    );
-
-    return {
-      success: Boolean(data.success ?? true),
-      message: firstString(data, ["message"], `Variable ${variableName} updated`),
-    };
-  }
-
-  async listEnvironmentVariables(serverId: string, appId: string) {
-    const data = await this.client.request(
-      "GET",
-      `/servers/${encodeURIComponent(serverId)}/apps/${encodeURIComponent(appId)}/environment-variables`,
-    );
-    return sanitizeEnvironmentVariables(data);
-  }
 }
-

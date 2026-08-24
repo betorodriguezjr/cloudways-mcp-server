@@ -7,7 +7,6 @@ import { registerListApplicationsTool } from "./listApplications.js";
 import { registerListServersTool } from "./listServers.js";
 import { registerManageSslTool } from "./manageSSL.js";
 import { registerRestartServiceTool } from "./restartService.js";
-import { registerEnvironmentVariableTools } from "./setEnvironmentVariable.js";
 import { registerViewLogsTool } from "./viewLogs.js";
 
 export function registerCloudwaysTools(server: McpServer) {
@@ -18,7 +17,6 @@ export function registerCloudwaysTools(server: McpServer) {
   registerGetServerStatsTool(server, context);
   registerDeployProjectTools(server, context);
   registerViewLogsTool(server, context);
-  registerEnvironmentVariableTools(server, context);
   registerManageSslTool(server, context);
   registerBackupTools(server, context);
   registerRestartServiceTool(server, context);
