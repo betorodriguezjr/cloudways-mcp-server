@@ -24,11 +24,12 @@ export class CloudwaysAuth {
 
     const email = getEnv("CLOUDWAYS_EMAIL");
     const apiToken = getEnv("CLOUDWAYS_API_TOKEN");
-    const preferredPath = optionalEnv("CLOUDWAYS_AUTH_PATH", "/oauth/token")!;
+    const preferredPath = optionalEnv("CLOUDWAYS_AUTH_PATH", "/oauth/access_token")!;
+    const fallbackPath = preferredPath === "/oauth/access_token" ? "/oauth/token" : "/oauth/access_token";
 
     const response = await this.postToken(preferredPath, email, apiToken).catch(async (error) => {
-      if (preferredPath !== "/oauth/access_token" && axios.isAxiosError(error) && error.response?.status === 404) {
-        return this.postToken("/oauth/access_token", email, apiToken);
+      if (axios.isAxiosError(error) && (error.response?.status === 404 || error.response?.status === 405)) {
+        return this.postToken(fallbackPath, email, apiToken);
       }
       throw error;
     });
